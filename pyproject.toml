@@ -1,0 +1,18 @@
+[project]
+name = "watcher"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Fred Israel", email = "fredpublico@gmail.com"},
+]
+dependencies = ["click>=8.1.8", "watchdog>=6.0.0"]
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[project.scripts]
+watcher = "watcher:main"
+
+[tool.pdm]
+distribution = true
