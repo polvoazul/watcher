@@ -3,6 +3,7 @@ import sys
 import time
 import subprocess
 import click
+from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -21,7 +22,7 @@ class CommandRunner:
         self.last_run_time = now
         click.clear()
         print(f"Running: {self.command}")
-        print("-" * 40)
+        print("-" * 10 + f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + "-" * 11)
         try:
             subprocess.run(self.command, shell=True)
         except Exception as e:
@@ -48,41 +49,36 @@ class ChangeHandler(FileSystemEventHandler):
         if file_path in self.runner.files:
             self.runner.run()
 
-@click.command()
+@click.command(no_args_is_help=True, context_settings={"help_option_names": ["-h", "--help"]})
+@click.argument('command', nargs=1)
 @click.argument('args', nargs=-1)
-@click.option('-g', '--git', is_flag=True, help='Use git tracked files')
-def main(args, git):
+@click.option('-g', '--git', is_flag=True, help='Use git tracked files. If set, all args are treated as the command.')
+def main(command, args, git):
     """Simple file watcher that runs a command on change.
-    
-    If -g is not set:
-    First arg is shell command, next args are files.
-    
-    If -g is set:
-    All args are the shell command (concatenated), and it watches files from 'git ls-files'.
     """
-    if not args and not git:
-        click.echo("Error: No command or files provided.")
-        sys.exit(1)
-
     if git:
-        command = " ".join(args)
+        if not command:
+            raise click.UsageError("Git mode requires at least one argument for the command.")
+        command = (command + " " + " ".join(args)).strip()
         try:
-            files_output = subprocess.check_output(["git", "ls-files"], text=True)
+            files_output = subprocess.check_output(["git", "ls-files"], text=True, stderr=subprocess.STDOUT)
             files = files_output.strip().splitlines()
         except subprocess.CalledProcessError:
-            click.echo("Error: Not a git repository or git not found.")
-            sys.exit(1)
+            raise click.ClickException("Not a git repository or git error while listing files.")
     else:
         if len(args) < 1:
-            click.echo("Error: Command missing.")
-            sys.exit(1)
-        command = args[0]
-        files = args[1:]
-        if not files:
-            click.echo("Error: No files to watch specified.")
-            sys.exit(1)
+             raise click.UsageError("Command missing.")
+        if len(args) < 2:
+             raise click.UsageError("At least one file must be specified to watch.")
+        
+        files = args
 
-    runner = CommandRunner(command, files)
+    # Filter out files that don't exist
+    existing_files = [f for f in files if os.path.exists(f)]
+    if not existing_files and not git:
+        raise click.ClickException(f"None of the specified files exist: {', '.join(files)}")
+    
+    runner = CommandRunner(command, existing_files)
     
     # Run once initially
     runner.run()
@@ -90,20 +86,13 @@ def main(args, git):
     event_handler = ChangeHandler(runner)
     observer = Observer()
     
-    # We watch directories that contain our files
     watched_dirs = set()
-    for f in files:
+    for f in existing_files:
         dir_path = os.path.dirname(os.path.abspath(f))
         if os.path.exists(dir_path):
             watched_dirs.add(dir_path)
-        else:
-            # File might not exist yet but we should still watch parent if it exists
-            parent = os.path.dirname(dir_path)
-            if os.path.exists(parent):
-                watched_dirs.add(parent)
 
     if not watched_dirs:
-        # Fallback to current directory
         watched_dirs.add(".")
 
     for d in watched_dirs:
