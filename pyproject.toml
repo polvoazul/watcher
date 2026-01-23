@@ -13,6 +13,3 @@ license = {text = "MIT"}
 
 [project.scripts]
 watcher = "watcher:main"
-
-[tool.pdm]
-distribution = true
