@@ -21,6 +21,8 @@ class CommandRunner:
         
         self.last_run_time = now
         click.clear()
+        print('\033[3J', end='')
+        print('\033c', end='')
         print(f"Running: {self.command}")
         print("-" * 10 + f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + "-" * 11)
         try:
@@ -66,9 +68,9 @@ def main(command, args, git):
         except subprocess.CalledProcessError:
             raise click.ClickException("Not a git repository or git error while listing files.")
     else:
-        if len(args) < 1:
+        if not command:
              raise click.UsageError("Command missing.")
-        if len(args) < 2:
+        if not args:
              raise click.UsageError("At least one file must be specified to watch.")
         
         files = args
