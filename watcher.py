@@ -24,12 +24,16 @@ class CommandRunner:
         print('\033[3J', end='')
         print('\033c', end='')
         print(f"Running: {self.command}")
-        print("-" * 10 + f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + "-" * 11)
+        print("▶"*3 + "-" * 7 + f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + "-" * 11)
+        ok = False
         try:
             subprocess.run(self.command, shell=True)
+            ok = True
         except Exception as e:
             print(f"Error running command: {e}")
-        print("-" * 40)
+        except KeyboardInterrupt:
+            print("Canceled!")
+        print(("✔" if ok else "✖")*3 + "-" * 7 + f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}" + "-" * 11)
         print("Watching for changes...")
 
 class ChangeHandler(FileSystemEventHandler):
