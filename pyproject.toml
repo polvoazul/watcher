@@ -28,3 +28,6 @@ classifiers = [
 
 [project.scripts]
 watcher = "watcher:main"
+
+[tool.pytest.ini_options]
+testpaths = ["."]
