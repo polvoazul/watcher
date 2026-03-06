@@ -4,6 +4,7 @@ import time
 import subprocess
 from datetime import datetime
 from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler
 
 def main(argv=None):
@@ -33,20 +34,16 @@ def main(argv=None):
         print(f"Error: None of the specified files exist: {', '.join(files)}", file=sys.stderr)
         return 1
 
-    runner = CommandRunner(commands, files)
-
-    # Run once initially
-    runner.run(time.time())
-
+    runner = CommandRunner(commands)
+    runner.run(time.time())  # Run once initially
     event_handler = ChangeHandler(runner)
-    observer = Observer()
+    observer = PollingObserver()
 
-    watched_dirs = {os.path.dirname(os.path.abspath(f)) for f in files}
-    if not watched_dirs:
-        watched_dirs.add(os.path.abspath("."))
-
-    for d in watched_dirs:
-        observer.schedule(event_handler, d, recursive=False)
+    for f in files:
+        if os.path.isdir(f):
+            observer.schedule(event_handler, f, recursive=True)
+        else:
+            observer.schedule(event_handler, f, recursive=False)
 
     observer.start()
     try:
@@ -59,10 +56,8 @@ def main(argv=None):
 
 
 class CommandRunner:
-    def __init__(self, commands, files):
+    def __init__(self, commands):
         self.commands = commands
-        self.files = {os.path.abspath(f) for f in files}  # set for O(1) lookup
-        # Time when the most recent run started.
         self.last_run_start_time = 0.0
 
     def run(self, request_time: float):
@@ -110,18 +105,13 @@ class ChangeHandler(FileSystemEventHandler):
         self.runner = runner
 
     def _handle(self, event):
-        print("HELLO2!")
-        if event.is_directory:
-            return
-        if os.path.abspath(event.src_path) in self.runner.files:
-            self.runner.run(time.time())
+        print("HALLOU!")
+        self.runner.run(time.time())
 
     def on_modified(self, event):
-        print("HELLO!")
         self._handle(event)
 
     def on_created(self, event):
-        print("HELLO3!")
         self._handle(event)
 
 
@@ -229,7 +219,12 @@ def parse_args(argv: list[str]) -> dict:
                 "Flags must appear before the command."
             )
 
-    return { "command": command, "files": files, "shell": shell, "git": git}
+    # Resolve all file paths to absolute so that CommandRunner.files,
+    # watched_dirs, and ChangeHandler._handle all agree regardless of CWD.
+    files = [os.path.abspath(f) for f in files]
+
+    return {"command": command, "files": files, "shell": shell, "git": git}
+
 
 
 
